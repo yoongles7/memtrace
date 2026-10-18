@@ -14,19 +14,7 @@ A Django + FalkorDB application that simulates AI agent memory poisoning, forens
 
 ---
 
-## 1. Start FalkorDB
-
-FalkorDB exposes the same port as Redis (`6379`). The quickest way to start it is with Docker:
-
-```bash
-docker run -p 6379:6379 -it --rm falkordb/falkordb:latest
-```
-
-Leave this terminal running. If you already have FalkorDB or a compatible Redis/FalkorDB instance running elsewhere, set the environment variables described in [Configuration](#configuration) before proceeding.
-
----
-
-## 2. Clone and set up the Python environment
+## 1. Clone and set up the Python environment
 
 ```bash
 git clone https://github.com/yoongles7/memtrace.git
@@ -37,6 +25,18 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt
 ```
+
+---
+
+## 2. Start FalkorDB
+
+FalkorDB exposes the same port as Redis (`6379`). The quickest way to start it is with Docker:
+
+```bash
+docker run -d --name falkordb -p 6379:6379 -p 3000:3000 falkordb/falkordb:latest
+```
+
+Open http://localhost:3000. You should see the FalkorDB Browser. If you already have FalkorDB or a compatible Redis/FalkorDB instance running elsewhere, set the environment variables described in [Configuration](#configuration) before proceeding.
 
 ---
 
