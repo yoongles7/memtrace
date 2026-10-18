@@ -19,7 +19,9 @@ from django.urls import include, path
 from django.views.generic import TemplateView
 
 urlpatterns = [
-    path('',       TemplateView.as_view(template_name='dashboard.html'), name='dashboard'),
-    path('admin/', admin.site.urls),
-    path('api/',   include('core.urls')),
+    path('',              TemplateView.as_view(template_name='landing.html'),      name='landing'),
+    path('how-it-works/', TemplateView.as_view(template_name='how_it_works.html'), name='how-it-works'),
+    path('app/',          TemplateView.as_view(template_name='dashboard.html'),    name='dashboard'),
+    path('admin/',        admin.site.urls),
+    path('api/',          include('core.urls')),
 ]

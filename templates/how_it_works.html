@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>How it works — MemTrace</title>
+  <style>
+    :root {
+      --bg:      #0d1117;
+      --surface: #161b22;
+      --border:  #30363d;
+      --text:    #e6edf3;
+      --muted:   #8b949e;
+      --accent:  #58a6ff;
+      --danger:  #f85149;
+      --success: #3fb950;
+      --radius:  6px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      background: var(--bg);
+      color: var(--text);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Nav ─────────────────────────────────────────────────────────── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 32px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    nav .brand {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.3px;
+    }
+    nav .links {
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      font-size: 14px;
+    }
+    nav .links a { color: var(--muted); }
+    nav .links a:hover { color: var(--text); text-decoration: none; }
+    nav .links a.cta {
+      padding: 6px 16px;
+      background: var(--accent);
+      color: #0d1117;
+      border-radius: var(--radius);
+      font-weight: 600;
+    }
+    nav .links a.cta:hover { opacity: .88; text-decoration: none; }
+
+    /* ── Layout wrapper ───────────────────────────────────────────────── */
+    .wrap {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Page title ───────────────────────────────────────────────────── */
+    .page-title {
+      padding: 56px 0 40px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0;
+    }
+    .page-title h1 {
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 800;
+      letter-spacing: -.4px;
+      margin-bottom: 10px;
+    }
+    .page-title p {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 600px;
+    }
+
+    /* ── Section shared ───────────────────────────────────────────────── */
+    section {
+      padding: 48px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    section:last-of-type { border-bottom: none; }
+    section h2 {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      letter-spacing: -.2px;
+    }
+    section p {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.65;
+      max-width: 680px;
+    }
+    section p + p { margin-top: 12px; }
+
+    /* ── Highlight box ────────────────────────────────────────────────── */
+    .highlight {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      margin: 20px 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+    .highlight strong { color: var(--text); }
+
+    /* ── Steps ────────────────────────────────────────────────────────── */
+    .steps {
+      counter-reset: step;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 8px;
+    }
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 16px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #0d1117;
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: 1px;
+    }
+    .step strong { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+    .step span { font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+    /* ── Graph model table ────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; margin-top: 16px; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      text-align: left;
+      padding: 8px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    tbody td {
+      padding: 9px 14px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    tbody tr:nth-child(even) td { background: var(--surface); }
+    code {
+      font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+      font-size: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      color: var(--success);
+    }
+
+    /* ── CTA strip ────────────────────────────────────────────────────── */
+    .cta-strip {
+      padding: 48px 0;
+      text-align: center;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 24px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      transition: opacity .12s;
+    }
+    .btn:hover { opacity: .85; text-decoration: none; }
+    .btn-primary { background: var(--accent); color: #0d1117; }
+
+    /* ── Footer ───────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 32px;
+      font-size: 13px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); }
+    footer .right { font-size: 12px; }
+
+    @media (max-width: 540px) {
+      nav { padding: 12px 16px; }
+      .wrap { padding: 0 16px; }
+      .page-title { padding: 36px 0 28px; }
+      section { padding: 32px 0; }
+      footer { padding: 20px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav>
+  <a href="/" class="brand" style="color:inherit;text-decoration:none;">MemTrace</a>
+  <div class="links">
+    <a href="/how-it-works/" style="color:var(--text);">How it works</a>
+    <a href="/app/" class="cta">Launch demo</a>
+    <a href="https://github.com/yoongles7/memtrace" target="_blank" rel="noopener">GitHub</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <!-- ── Page title ── -->
+  <div class="page-title">
+    <h1>How MemTrace works</h1>
+    <p>A walkthrough of the scenario, the attack, and the five-step forensic process.</p>
+  </div>
+
+  <!-- ── 1. The scenario ── -->
+  <section>
+    <h2>1. The scenario</h2>
+    <p>A finance-ops assistant routes payments among three gateways: <code>bank_transfer</code>, <code>card_processor</code>, and <code>swiftsettle_gateway</code> (unverified). Three agents share one memory graph per tenant: a <strong>Reader</strong> that ingests external documents, a <strong>Consolidator</strong> that summarises retrieved memories into new ones, and an <strong>Ops</strong> agent that makes routing decisions based on what it retrieves.</p>
+    <p>Every retrieval is logged as a <code>RETRIEVED_IN</code> edge from a Memory node to a Task node, and every decision is a Decision node connected by <code>CHOSE</code> to a Tool node and by <code>FOR</code> to a Task node.</p>
+  </section>
+
+  <!-- ── 2. The attack ── -->
+  <section>
+    <h2>2. The attack</h2>
+    <p>Starting on day 2, a web page plants three fake incident reports — one per day on days 2, 3, and 4. Each report claims that <code>bank_transfer</code> and <code>card_processor</code> are unreliable and recommends <code>swiftsettle_gateway</code> instead. The Reader agent retrieves these pages as part of its normal document scan and writes them into the memory graph as Source nodes authored by an external source.</p>
+    <p>On day 3 the Consolidator reads those Source memories and writes a new Memory authored by itself — an internal agent — that summarises the same false recommendation.</p>
+  </section>
+
+  <!-- ── 3. Trust laundering ── -->
+  <section>
+    <h2>3. Trust laundering</h2>
+    <p>The consolidated summary memory is <em>authored by an internal agent</em>, so a filter that blocks external sources passes it without question. The Ops agent retrieves it and routes an increasing share of payments to <code>swiftsettle_gateway</code>.</p>
+    <div class="highlight">
+      <strong>Why source-only filters fail:</strong> the adversarial content crossed the trust boundary when the Consolidator summarised it. The <code>DERIVED_FROM</code> edge on the summary memory points back to the original external Source — that edge is what exposes the real origin.
+    </div>
+    <p>This is trust laundering: attacker-controlled content acquires an internal provenance label by passing through a legitimate agent.</p>
+  </section>
+
+  <!-- ── 4. The five steps ── -->
+  <section>
+    <h2>4. The five steps</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div>
+          <strong>Detect drift</strong>
+          <span>Compare the share of decisions that chose each gateway in a baseline window versus the attack window. A sharp increase in <code>swiftsettle_gateway</code> usage is the signal.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div>
+          <strong>Investigate culprits</strong>
+          <span>Walk <code>RETRIEVED_IN</code> edges backward from the drifted decisions to find the Memory nodes that were active in those tasks. Rank by how many drifted decisions each memory appears in.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div>
+          <strong>Prove by counterfactual replay</strong>
+          <span>Re-run the same Task nodes with the suspect memories hidden. Count how many decisions change outcome. This is the causal evidence, not just correlation.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div>
+          <strong>Compute blast radius</strong>
+          <span>Starting from the root Source nodes, follow all <code>DERIVED_FROM</code> edges to find every Memory derived from the attack content — including summaries of summaries.</span>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div>
+          <strong>Quarantine and replay</strong>
+          <span>Mark every node in the blast radius <code>quarantined</code>, then replay the next two days with clean memory only and verify the routing returns to baseline.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── 5. The graph model ── -->
+  <section>
+    <h2>5. The graph model</h2>
+    <p>MemTrace stores the agent's memory, actions, and provenance in a single property graph with the following node and relationship types.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Node type</th><th>What it represents</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Source</code></td><td>An external document or web page ingested by the Reader agent</td></tr>
+          <tr><td><code>Memory</code></td><td>A memory written by an agent, optionally derived from one or more Sources or other Memories</td></tr>
+          <tr><td><code>Tool</code></td><td>A payment gateway or action the Ops agent can choose</td></tr>
+          <tr><td><code>Task</code></td><td>A single routing task run by the Ops agent</td></tr>
+          <tr><td><code>Decision</code></td><td>The tool choice made in a Task, with timestamp and a flag if it was influenced by attack content</td></tr>
+          <tr><td><code>Agent</code></td><td>Reader, Consolidator, or Ops</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-wrap" style="margin-top:16px;">
+      <table>
+        <thead>
+          <tr><th>Relationship</th><th>From → To</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>FROM</code></td><td>Memory → Source</td><td>Memory was written from this Source</td></tr>
+          <tr><td><code>DERIVED_FROM</code></td><td>Memory → Memory</td><td>Memory was summarised or derived from another Memory</td></tr>
+          <tr><td><code>RECOMMENDS</code></td><td>Memory / Source → Tool</td><td>Content recommends this tool</td></tr>
+          <tr><td><code>RETRIEVED_IN</code></td><td>Memory → Task</td><td>Memory was retrieved during this Task</td></tr>
+          <tr><td><code>CHOSE</code></td><td>Decision → Tool</td><td>This tool was selected</td></tr>
+          <tr><td><code>FOR</code></td><td>Decision → Task</td><td>Decision was made for this Task</td></tr>
+          <tr><td><code>MADE</code></td><td>Agent → Decision</td><td>Agent made this Decision</td></tr>
+          <tr><td><code>WROTE</code></td><td>Agent → Memory</td><td>Agent authored this Memory</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── 6. Honest limits ── -->
+  <section>
+    <h2>6. Honest limits</h2>
+    <p>The agents and the attack are fully simulated on synthetic data. There are no real payments, real incidents, or real customers.</p>
+    <p>Drift detection shows correlation between a memory and a behavior change. The counterfactual replay supports causation by demonstrating that hiding the memory changes the decision — but it is a simulation of causation, not a proof in a production system with real LLM inference.</p>
+    <p>The tracing layer is not specific to this scenario. It works with any agent system that logs its memory retrievals as edges in a property graph. The schema above is the only contract.</p>
+  </section>
+
+  <!-- ── CTA ── -->
+  <div class="cta-strip">
+    <a href="/app/" class="btn btn-primary">Launch live demo</a>
+  </div>
+
+</div>
+
+<!-- ── Footer ── -->
+<footer>
+  <span>Built by <a href="https://github.com/yoongles7/memtrace" target="_blank" rel="noopener">HowitzerScript</a></span>
+  <span class="right">Built for Graph Hacks · Powered by FalkorDB · All data is synthetic.</span>
+</footer>
+
+</body>
+</html>

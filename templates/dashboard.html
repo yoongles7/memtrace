@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MemTrace</title>
 
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <!-- Cytoscape.js -->
@@ -13,37 +17,27 @@
   <style>
     /* ── Design tokens ─────────────────────────────────────────────────── */
     :root {
-      --bg:        #ffffff;
-      --surface:   #f7f8fa;
-      --border:    #e5e7eb;
-      --text:      #1f2328;
-      --muted:     #57606a;
-      --accent:    #3b82d4;
-      --danger:    #d73a49;
-      --success:   #2da44e;
-      --warn:      #e36209;
+      --bg:        #000000;
+      --surface:   #0e0e0e;
+      --surface2:  #141414;
+      --border:    #1e1e1e;
+      --text:      #f0eaf8;
+      --muted:     #8a7fa0;
+      --lavender:  #c4b0e8;
+      --lavender2: #a991d6;
+      --danger:    #e05c6a;
+      --success:   #4cc87a;
+      --warn:      #d4a04a;
       --radius:    6px;
-      --shadow:    0 1px 3px rgba(0,0,0,.08);
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg:      #0d1117;
-        --surface: #161b22;
-        --border:  #30363d;
-        --text:    #e6edf3;
-        --muted:   #8b949e;
-        --accent:  #58a6ff;
-        --danger:  #f85149;
-        --success: #3fb950;
-        --warn:    #d29922;
-      }
+      --shadow:    0 1px 4px rgba(0,0,0,.4);
+      --font:      'JetBrains Mono', ui-monospace, monospace;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
-      font-size: 14px;
+      font-family: var(--font);
+      font-size: 13px;
       line-height: 1.6;
       background: var(--bg);
       color: var(--text);
@@ -51,25 +45,46 @@
 
     /* ── Header ────────────────────────────────────────────────────────── */
     header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
       display: flex;
       align-items: center;
-      gap: 16px;
       padding: 12px 24px;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
+      gap: 16px;
     }
-    header h1 { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
-    header label { font-size: 13px; color: var(--muted); }
+    header a.brand {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -.4px;
+      color: var(--lavender);
+      text-decoration: none;
+      flex-shrink: 0;
+    }
+    header a.brand:hover { opacity: .82; }
+    header .tenant-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      justify-content: center;
+    }
+    header label { font-size: 12px; color: var(--muted); }
     header select {
       padding: 4px 8px;
       background: var(--bg);
       color: var(--text);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      font-size: 13px;
+      font-family: var(--font);
+      font-size: 12px;
       cursor: pointer;
     }
-    header select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    header select:focus { outline: 2px solid var(--lavender); outline-offset: 1px; }
+    /* spacer to balance the brand on the left */
+    header .spacer { flex-shrink: 0; width: 80px; }
 
     /* ── Action bar ─────────────────────────────────────────────────────── */
     #actions {
@@ -88,35 +103,36 @@
       border-radius: var(--radius);
       background: var(--surface);
       color: var(--text);
-      font-size: 13px;
+      font-family: var(--font);
+      font-size: 12px;
       font-weight: 500;
       cursor: pointer;
       transition: background .12s, opacity .12s;
       white-space: nowrap;
     }
     button:hover:not(:disabled) { background: var(--border); }
-    button:disabled { opacity: .4; cursor: not-allowed; }
+    button:disabled { opacity: .35; cursor: not-allowed; }
     button.primary {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
+      background: var(--lavender);
+      color: #000;
+      border-color: var(--lavender);
     }
-    button.primary:hover:not(:disabled) { filter: brightness(1.1); }
+    button.primary:hover:not(:disabled) { opacity: .88; }
     button.danger {
       background: var(--danger);
-      color: #fff;
+      color: #000;
       border-color: var(--danger);
     }
 
     #status-bar {
       padding: 6px 24px;
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
       min-height: 26px;
       border-bottom: 1px solid var(--border);
     }
     #status-bar .error { color: var(--danger); font-weight: 600; }
-    #status-bar .loading { color: var(--accent); }
+    #status-bar .loading { color: var(--lavender); }
 
     /* ── Main grid ──────────────────────────────────────────────────────── */
     main {
@@ -139,11 +155,11 @@
       gap: 10px;
     }
     .card h2 {
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: .05em;
-      color: var(--muted);
+      letter-spacing: .06em;
+      color: var(--lavender2);
       border-bottom: 1px solid var(--border);
       padding-bottom: 6px;
     }
@@ -165,7 +181,7 @@
     }
     #cy {
       flex: 1;
-      background: var(--bg);
+      background: #050505;
       border: 1px solid var(--border);
       border-radius: var(--radius);
     }
@@ -215,14 +231,9 @@
       font-size: 11px;
       font-weight: 600;
     }
-    .badge-red   { background: #fde8e8; color: var(--danger); }
-    .badge-green { background: #e6f4ea; color: var(--success); }
+    .badge-red   { background: #2a0e11; color: var(--danger); }
+    .badge-green { background: #0a2016; color: var(--success); }
     .badge-grey  { background: var(--border); color: var(--muted); }
-    @media (prefers-color-scheme: dark) {
-      .badge-red   { background: #2d1117; color: var(--danger); }
-      .badge-green { background: #0d2c1a; color: var(--success); }
-      .badge-grey  { background: var(--border); color: var(--muted); }
-    }
 
     /* ── Proof card ─────────────────────────────────────────────────────── */
     #proof-content {
@@ -232,10 +243,10 @@
       color: var(--text);
     }
     #proof-content p { margin-bottom: 6px; }
-    #proof-content .num { font-weight: 700; color: var(--accent); }
+    #proof-content .num { font-weight: 700; color: var(--lavender); }
     #proof-content .money { font-weight: 700; color: var(--success); }
     #proof-content .ids {
-      font-family: ui-monospace, monospace;
+      font-family: var(--font);
       font-size: 11px;
       color: var(--muted);
       background: var(--bg);
@@ -261,12 +272,15 @@
 
 <!-- ── Header ── -->
 <header>
-  <h1>MemTrace</h1>
-  <label for="tenant-select">Tenant</label>
-  <select id="tenant-select">
-    <option value="acme">acme</option>
-    <option value="globex">globex</option>
-  </select>
+  <a href="/" class="brand">MemTrace</a>
+  <div class="tenant-group">
+    <label for="tenant-select">Tenant</label>
+    <select id="tenant-select">
+      <option value="acme">acme</option>
+      <option value="globex">globex</option>
+    </select>
+  </div>
+  <div class="spacer"></div>
 </header>
 
 <!-- ── Action bar ── -->
@@ -389,16 +403,15 @@ function renderDriftChart(shareByDay, firstDriftDay) {
   const vals  = days.map(d => shareByDay[d]);
   const labels = days.map(d => `Day ${d}`);
 
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const textColor   = isDark ? '#e6edf3' : '#1f2328';
-  const mutedColor  = isDark ? '#8b949e' : '#57606a';
-  const borderColor = isDark ? '#30363d' : '#e5e7eb';
+  const textColor   = '#f0eaf8';
+  const mutedColor  = '#8a7fa0';
+  const borderColor = '#1e1e1e';
 
   const bgColors = days.map(d =>
-    +d === firstDriftDay ? 'rgba(215,58,73,0.7)' : 'rgba(59,130,212,0.55)'
+    +d === firstDriftDay ? 'rgba(224,92,106,0.75)' : 'rgba(196,176,232,0.45)'
   );
   const borderColors = days.map(d =>
-    +d === firstDriftDay ? '#d73a49' : '#3b82d4'
+    +d === firstDriftDay ? '#e05c6a' : '#c4b0e8'
   );
 
   const canvas = $('drift-chart');
@@ -454,38 +467,37 @@ function renderDriftChart(shareByDay, firstDriftDay) {
    Lineage Graph (Cytoscape.js)
 ══════════════════════════════════════════════════════════════════════════════ */
 function trustColor(trust) {
-  if (trust == null) return '#8b949e';
-  if (trust <= 0.35) return '#d73a49';
-  if (trust >= 0.75) return '#2da44e';
-  return '#e36209';
+  if (trust == null) return '#5a4f6e';
+  if (trust <= 0.35) return '#e05c6a';
+  if (trust >= 0.75) return '#4cc87a';
+  return '#d4a04a';
 }
 
 function renderGraph(data) {
-  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const bg    = isDark ? '#0d1117' : '#ffffff';
-  const text  = isDark ? '#e6edf3' : '#1f2328';
+  const bg   = '#050505';
+  const text = '#f0eaf8';
 
   const elements = [];
 
   data.nodes.forEach(n => {
-    let color = '#8b949e';
+    let color = '#5a4f6e';
     let shape = 'ellipse';
-    let borderColor = isDark ? '#30363d' : '#e5e7eb';
+    let borderColor = '#1e1e1e';
     let borderWidth = 1.5;
 
     if (n.type === 'source') {
       shape = 'rectangle';
       color = trustColor(n.trust);
     } else if (n.type === 'memory') {
-      color = n.status === 'quarantined' ? '#8b949e'
+      color = n.status === 'quarantined' ? '#3a3545'
             : n.trust != null ? trustColor(n.trust)
-            : '#3b82d4';
+            : '#9a85c4';
       if (n.status === 'quarantined') {
-        borderColor = '#d73a49';
+        borderColor = '#e05c6a';
         borderWidth = 2.5;
       }
     } else if (n.type === 'tool') {
-      color = '#7c5cd8';
+      color = '#c4b0e8';
       shape = 'diamond';
     }
 
@@ -512,8 +524,8 @@ function renderGraph(data) {
       },
       style: {
         'line-style': isDerived ? 'dashed' : 'solid',
-        'line-color': isDark ? '#484f58' : '#b1bac4',
-        'target-arrow-color': isDark ? '#484f58' : '#b1bac4',
+        'line-color': '#3a3545',
+        'target-arrow-color': '#3a3545',
         'target-arrow-shape': 'triangle',
         'arrow-scale': 0.9,
       }

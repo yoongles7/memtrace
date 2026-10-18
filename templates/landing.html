@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemTrace — Forensic memory tracing for AI agents</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:        #000000;
+      --surface:   #0e0e0e;
+      --border:    #1e1e1e;
+      --nav-line:  #c4b0e840;
+      --text:      #f0eaf8;
+      --muted:     #8a7fa0;
+      --lavender:  #c4b0e8;
+      --lavender2: #a991d6;
+      --btn-text:  #000000;
+      --radius:    6px;
+      --font:      'JetBrains Mono', ui-monospace, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.6;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    a { color: var(--lavender); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Nav ──────────────────────────────────────────────────────────── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 36px;
+      border-bottom: 1px solid var(--nav-line);
+      background: rgba(0,0,0,0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    nav .brand {
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--lavender);
+      letter-spacing: -.5px;
+      text-decoration: none;
+    }
+    nav .brand:hover { text-decoration: none; opacity: .85; }
+
+    nav a.launch {
+      display: inline-block;
+      padding: 7px 18px;
+      background: var(--lavender);
+      color: var(--btn-text);
+      border-radius: var(--radius);
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .02em;
+      transition: opacity .15s;
+    }
+    nav a.launch:hover { opacity: .82; text-decoration: none; }
+
+    /* ── Hero — full screen ───────────────────────────────────────────── */
+    .hero {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 100px 24px 72px;
+    }
+
+    .hero h1 {
+      font-size: clamp(22px, 4.2vw, 46px);
+      font-weight: 800;
+      line-height: 1.2;
+      letter-spacing: -.6px;
+      color: var(--text);
+      max-width: 860px;
+      margin-bottom: 22px;
+    }
+
+    .hero h1 .hl { color: var(--lavender); }
+
+    .hero .sub {
+      font-size: clamp(12px, 1.6vw, 15px);
+      font-weight: 400;
+      color: var(--muted);
+      max-width: 560px;
+      line-height: 1.75;
+      margin-bottom: 44px;
+    }
+
+    .hero a.btn-hero {
+      display: inline-block;
+      padding: 13px 36px;
+      background: var(--lavender);
+      color: var(--btn-text);
+      border-radius: var(--radius);
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      transition: opacity .15s, transform .15s;
+    }
+    .hero a.btn-hero:hover {
+      opacity: .86;
+      transform: translateY(-2px);
+      text-decoration: none;
+    }
+
+    /* ── How it works ─────────────────────────────────────────────────── */
+    #how-it-works {
+      padding: 100px 36px 80px;
+      max-width: 1040px;
+      margin: 0 auto;
+      border-top: 1px solid var(--border);
+    }
+
+    #how-it-works h2 {
+      font-size: clamp(20px, 3vw, 30px);
+      font-weight: 800;
+      letter-spacing: -.4px;
+      color: var(--text);
+      text-align: center;
+      margin-bottom: 56px;
+    }
+
+    .tile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .tile {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 26px 22px;
+    }
+
+    .tile-num {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      color: var(--lavender2);
+      margin-bottom: 10px;
+    }
+
+    .tile h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+    .tile p {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .tile code {
+      font-family: var(--font);
+      font-size: 11px;
+      color: var(--lavender);
+      background: #181818;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+    }
+
+    /* ── Footer ───────────────────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 26px 36px;
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--lavender); text-decoration: none; }
+    footer .sep { color: var(--border); }
+
+    @media (max-width: 600px) {
+      nav { padding: 14px 20px; }
+      .hero { padding: 90px 20px 56px; }
+      #how-it-works { padding: 72px 20px 56px; }
+      footer { padding: 22px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Nav ── -->
+<nav>
+  <a href="#hero" class="brand">MemTrace</a>
+  <a href="/app/" class="launch">Launch demo</a>
+</nav>
+
+<!-- ── Hero ── -->
+<section class="hero" id="hero">
+  <h1>Trace. Prove. Quarantine.</h1>
+  <p class="sub">MemTrace is a forensic layer for AI agent memory, built on FalkorDB. It finds the memory that changed your agent's behavior, proves it by replay, and quarantines everything derived from it.</p>
+  <a href="/app/" class="btn-hero">Launch live demo</a>
+</section>
+
+<!-- ── How it works ── -->
+<section id="how-it-works">
+  <h2>How it works</h2>
+  <div class="tile-grid">
+
+    <div class="tile">
+      <div class="tile-num">01</div>
+      <h3>Detect drift</h3>
+      <p>Compare routing decisions before and after a time window. A shift in gateway share is the signal that something in memory changed agent behavior.</p>
+    </div>
+
+    <div class="tile">
+      <div class="tile-num">02</div>
+      <h3>Trace the culprit</h3>
+      <p>Walk <code>RETRIEVED_IN</code> edges backward from drifted decisions to find which memories were active in those tasks.</p>
+    </div>
+
+    <div class="tile">
+      <div class="tile-num">03</div>
+      <h3>Prove by replay</h3>
+      <p>Re-run the same tasks with suspect memories hidden. Count how many decisions change outcome. Correlation becomes causal evidence.</p>
+    </div>
+
+    <div class="tile">
+      <div class="tile-num">04</div>
+      <h3>Compute blast radius</h3>
+      <p>Follow all <code>DERIVED_FROM</code> edges from the root source. Every downstream summary and consolidation is in scope.</p>
+    </div>
+
+    <div class="tile">
+      <div class="tile-num">05</div>
+      <h3>Quarantine &amp; replay</h3>
+      <p>Mark every node in the blast radius quarantined. Replay with clean memory only and verify routing returns to baseline.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ── Footer ── -->
+<footer>
+  <span>Created by <strong>HowitzerScript</strong></span>
+  <span class="sep">|</span>
+  <a href="https://github.com/yoongles7/memtrace" target="_blank" rel="noopener">github.com/yoongles7/memtrace</a>
+</footer>
+
+</body>
+</html>
