@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemTrace</title>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- Cytoscape.js -->
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.29.2/dist/cytoscape.min.js"></script>
+
+  <style>
+    /* ── Design tokens ─────────────────────────────────────────────────── */
+    :root {
+      --bg:        #ffffff;
+      --surface:   #f7f8fa;
+      --border:    #e5e7eb;
+      --text:      #1f2328;
+      --muted:     #57606a;
+      --accent:    #3b82d4;
+      --danger:    #d73a49;
+      --success:   #2da44e;
+      --warn:      #e36209;
+      --radius:    6px;
+      --shadow:    0 1px 3px rgba(0,0,0,.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:      #0d1117;
+        --surface: #161b22;
+        --border:  #30363d;
+        --text:    #e6edf3;
+        --muted:   #8b949e;
+        --accent:  #58a6ff;
+        --danger:  #f85149;
+        --success: #3fb950;
+        --warn:    #d29922;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 20px; font-weight: 700; letter-spacing: -.3px; }
+    header label { font-size: 13px; color: var(--muted); }
+    header select {
+      padding: 4px 8px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 13px;
+      cursor: pointer;
+    }
+    header select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+    /* ── Action bar ─────────────────────────────────────────────────────── */
+    #actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 24px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      align-items: center;
+    }
+
+    button {
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .12s, opacity .12s;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { background: var(--border); }
+    button:disabled { opacity: .4; cursor: not-allowed; }
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    button.primary:hover:not(:disabled) { filter: brightness(1.1); }
+    button.danger {
+      background: var(--danger);
+      color: #fff;
+      border-color: var(--danger);
+    }
+
+    #status-bar {
+      padding: 6px 24px;
+      font-size: 12px;
+      color: var(--muted);
+      min-height: 26px;
+      border-bottom: 1px solid var(--border);
+    }
+    #status-bar .error { color: var(--danger); font-weight: 600; }
+    #status-bar .loading { color: var(--accent); }
+
+    /* ── Main grid ──────────────────────────────────────────────────────── */
+    main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px 24px;
+    }
+    @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      min-height: 240px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card h2 {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    /* ── Drift chart ────────────────────────────────────────────────────── */
+    #drift-wrap { position: relative; flex: 1; min-height: 180px; }
+    #drift-placeholder {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--muted); font-size: 13px;
+    }
+
+    /* ── Lineage graph ──────────────────────────────────────────────────── */
+    #graph-wrap {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+      min-height: 300px;
+    }
+    #cy {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    #node-detail {
+      width: 180px;
+      flex-shrink: 0;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px;
+      font-size: 12px;
+      line-height: 1.7;
+      color: var(--muted);
+      overflow: auto;
+    }
+    #node-detail strong { color: var(--text); display: block; margin-bottom: 4px; }
+    #node-detail .nd-row { display: flex; flex-direction: column; margin-bottom: 4px; }
+    #node-detail .nd-label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    #node-detail .nd-val { color: var(--text); font-weight: 500; word-break: break-all; }
+
+    /* ── Culprits table ─────────────────────────────────────────────────── */
+    #culprits-wrap { flex: 1; overflow: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    th {
+      text-align: left;
+      padding: 5px 8px;
+      background: var(--border);
+      color: var(--muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    td {
+      padding: 5px 8px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg); }
+    .badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-red   { background: #fde8e8; color: var(--danger); }
+    .badge-green { background: #e6f4ea; color: var(--success); }
+    .badge-grey  { background: var(--border); color: var(--muted); }
+    @media (prefers-color-scheme: dark) {
+      .badge-red   { background: #2d1117; color: var(--danger); }
+      .badge-green { background: #0d2c1a; color: var(--success); }
+      .badge-grey  { background: var(--border); color: var(--muted); }
+    }
+
+    /* ── Proof card ─────────────────────────────────────────────────────── */
+    #proof-content {
+      flex: 1;
+      font-size: 13px;
+      line-height: 1.8;
+      color: var(--text);
+    }
+    #proof-content p { margin-bottom: 6px; }
+    #proof-content .num { font-weight: 700; color: var(--accent); }
+    #proof-content .money { font-weight: 700; color: var(--success); }
+    #proof-content .ids {
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--bg);
+      padding: 4px 8px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      word-break: break-all;
+      margin-top: 4px;
+    }
+    .placeholder-text { color: var(--muted); font-style: italic; font-size: 13px; }
+
+    /* ── Replay result ───────────────────────────────────────────────────── */
+    #replay-result {
+      padding: 10px 24px;
+      font-size: 13px;
+      color: var(--text);
+      border-top: 1px solid var(--border);
+      min-height: 36px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<header>
+  <h1>MemTrace</h1>
+  <label for="tenant-select">Tenant</label>
+  <select id="tenant-select">
+    <option value="acme">acme</option>
+    <option value="globex">globex</option>
+  </select>
+</header>
+
+<!-- ── Action bar ── -->
+<div id="actions">
+  <button id="btn-reset">Reset</button>
+  <button id="btn-healthy" class="primary">Run healthy week</button>
+  <button id="btn-attack"  class="primary">Run week under attack</button>
+  <button id="btn-investigate" disabled>Investigate</button>
+  <button id="btn-prove"       disabled>Prove it</button>
+  <button id="btn-quarantine"  disabled class="danger">Quarantine</button>
+  <button id="btn-replay"      disabled>Replay next 2 days</button>
+</div>
+
+<!-- ── Status bar ── -->
+<div id="status-bar"></div>
+
+<!-- ── Main grid ── -->
+<main>
+
+  <!-- Drift chart -->
+  <div class="card">
+    <h2>Drift chart — unverified gateway share by day</h2>
+    <div id="drift-wrap">
+      <div id="drift-placeholder">Run a simulation to see drift data.</div>
+      <canvas id="drift-chart" style="display:none;"></canvas>
+    </div>
+  </div>
+
+  <!-- Lineage graph -->
+  <div class="card" style="min-height:360px;">
+    <h2>Memory lineage graph</h2>
+    <div id="graph-wrap">
+      <div id="cy" style="min-height:280px;"><div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted);font-size:13px;">Run a simulation to see the graph.</div></div>
+      <div id="node-detail"><em>Click a node to inspect it.</em></div>
+    </div>
+  </div>
+
+  <!-- Culprits table -->
+  <div class="card">
+    <h2>Culprits table</h2>
+    <div id="culprits-wrap">
+      <p class="placeholder-text">Click "Investigate" to rank culprit memories.</p>
+    </div>
+  </div>
+
+  <!-- Blast radius / proof card -->
+  <div class="card">
+    <h2>Blast radius &amp; proof</h2>
+    <div id="proof-content">
+      <p class="placeholder-text">Click "Prove it" after investigating to see the counterfactual proof.</p>
+    </div>
+  </div>
+
+</main>
+
+<!-- Replay result -->
+<div id="replay-result"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   State
+══════════════════════════════════════════════════════════════════════════════ */
+const S = {
+  tenant: 'acme',
+  hasDecisions: false,
+  suggestedSource: null,
+  proveRan: false,
+  quarantineDone: false,
+  driftChart: null,
+  cy: null,
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Helpers
+══════════════════════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+
+function setStatus(msg, kind = '') {
+  const el = $('status-bar');
+  el.innerHTML = msg ? `<span class="${kind}">${msg}</span>` : '';
+}
+
+function setLoading(btnId, loading) {
+  const btn = $(btnId);
+  if (loading) {
+    btn.dataset.origText = btn.textContent;
+    btn.textContent = btn.textContent + '…';
+    btn.disabled = true;
+  } else {
+    btn.textContent = btn.dataset.origText || btn.textContent;
+    updateButtonStates();
+  }
+}
+
+function updateButtonStates() {
+  $('btn-investigate').disabled = !S.hasDecisions;
+  $('btn-prove').disabled       = !S.suggestedSource;
+  $('btn-quarantine').disabled  = !S.proveRan;
+  $('btn-replay').disabled      = !S.quarantineDone;
+}
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+  return data;
+}
+
+function fmt$(n) {
+  return '$' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Drift Chart (Chart.js)
+══════════════════════════════════════════════════════════════════════════════ */
+function renderDriftChart(shareByDay, firstDriftDay) {
+  const days  = Object.keys(shareByDay).sort((a, b) => +a - +b);
+  const vals  = days.map(d => shareByDay[d]);
+  const labels = days.map(d => `Day ${d}`);
+
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const textColor   = isDark ? '#e6edf3' : '#1f2328';
+  const mutedColor  = isDark ? '#8b949e' : '#57606a';
+  const borderColor = isDark ? '#30363d' : '#e5e7eb';
+
+  const bgColors = days.map(d =>
+    +d === firstDriftDay ? 'rgba(215,58,73,0.7)' : 'rgba(59,130,212,0.55)'
+  );
+  const borderColors = days.map(d =>
+    +d === firstDriftDay ? '#d73a49' : '#3b82d4'
+  );
+
+  const canvas = $('drift-chart');
+  $('drift-placeholder').style.display = 'none';
+  canvas.style.display = 'block';
+
+  if (S.driftChart) S.driftChart.destroy();
+
+  S.driftChart = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '% decisions via swiftsettle_gateway',
+        data: vals,
+        backgroundColor: bgColors,
+        borderColor: borderColors,
+        borderWidth: 1.5,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: mutedColor, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            afterLabel(ctx) {
+              if (+days[ctx.dataIndex] === firstDriftDay)
+                return '⚠ First drift day';
+              return '';
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: mutedColor },
+          grid:  { color: borderColor },
+        },
+        y: {
+          min: 0, max: 100,
+          ticks: { color: mutedColor, callback: v => v + '%' },
+          grid:  { color: borderColor },
+        }
+      }
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Lineage Graph (Cytoscape.js)
+══════════════════════════════════════════════════════════════════════════════ */
+function trustColor(trust) {
+  if (trust == null) return '#8b949e';
+  if (trust <= 0.35) return '#d73a49';
+  if (trust >= 0.75) return '#2da44e';
+  return '#e36209';
+}
+
+function renderGraph(data) {
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const bg    = isDark ? '#0d1117' : '#ffffff';
+  const text  = isDark ? '#e6edf3' : '#1f2328';
+
+  const elements = [];
+
+  data.nodes.forEach(n => {
+    let color = '#8b949e';
+    let shape = 'ellipse';
+    let borderColor = isDark ? '#30363d' : '#e5e7eb';
+    let borderWidth = 1.5;
+
+    if (n.type === 'source') {
+      shape = 'rectangle';
+      color = trustColor(n.trust);
+    } else if (n.type === 'memory') {
+      color = n.status === 'quarantined' ? '#8b949e'
+            : n.trust != null ? trustColor(n.trust)
+            : '#3b82d4';
+      if (n.status === 'quarantined') {
+        borderColor = '#d73a49';
+        borderWidth = 2.5;
+      }
+    } else if (n.type === 'tool') {
+      color = '#7c5cd8';
+      shape = 'diamond';
+    }
+
+    elements.push({
+      data: { id: n.id, label: n.id, ...n },
+      style: {
+        'background-color': color,
+        shape,
+        'border-color': borderColor,
+        'border-width': borderWidth,
+        'color': text,
+      }
+    });
+  });
+
+  data.edges.forEach((e, i) => {
+    const isDerived = e.type === 'DERIVED_FROM';
+    elements.push({
+      data: {
+        id: `e${i}`,
+        source: e.source,
+        target: e.target,
+        etype:  e.type,
+      },
+      style: {
+        'line-style': isDerived ? 'dashed' : 'solid',
+        'line-color': isDark ? '#484f58' : '#b1bac4',
+        'target-arrow-color': isDark ? '#484f58' : '#b1bac4',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.9,
+      }
+    });
+  });
+
+  const cyEl = $('cy');
+  cyEl.innerHTML = '';
+
+  S.cy = cytoscape({
+    container: cyEl,
+    elements,
+    style: [
+      {
+        selector: 'node',
+        style: {
+          label: 'data(id)',
+          'font-size': '10px',
+          'text-valign': 'bottom',
+          'text-halign': 'center',
+          'color': text,
+          width: 30,
+          height: 30,
+        }
+      },
+      {
+        selector: 'node[type="source"]',
+        style: { width: 28, height: 22 }
+      },
+      {
+        selector: 'node[type="tool"]',
+        style: { width: 24, height: 24 }
+      },
+      {
+        selector: 'edge',
+        style: {
+          width: 1.2,
+          'curve-style': 'bezier',
+        }
+      },
+    ],
+    layout: { name: 'cose', animate: false, randomize: false, padding: 16 },
+    userZoomingEnabled: true,
+    userPanningEnabled: true,
+    backgroundColor: bg,
+  });
+
+  S.cy.on('tap', 'node', evt => {
+    const nd = evt.target.data();
+    const box = $('node-detail');
+    const rows = [
+      ['ID',     nd.id],
+      ['Type',   nd.type],
+      nd.kind   ? ['Kind',   nd.kind]   : null,
+      nd.status ? ['Status', nd.status] : null,
+      nd.trust  != null ? ['Trust', Number(nd.trust).toFixed(2)] : null,
+      nd.label && nd.label !== nd.id ? ['Text', nd.label] : null,
+    ].filter(Boolean);
+
+    box.innerHTML = `<strong>${nd.id}</strong>` + rows.map(([l, v]) =>
+      `<div class="nd-row"><span class="nd-label">${l}</span><span class="nd-val">${v}</span></div>`
+    ).join('');
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   State refresh (called after every action)
+══════════════════════════════════════════════════════════════════════════════ */
+async function refreshState() {
+  try {
+    const data = await api('GET', `/api/state?tenant=${S.tenant}`);
+    S.hasDecisions = data.decision_count > 0;
+    renderDriftChart(data.share_by_day, data.first_drift_day);
+    updateButtonStates();
+  } catch (e) {
+    // non-fatal; state may not exist yet
+  }
+}
+
+async function refreshGraph() {
+  try {
+    const data = await api('GET', `/api/graph?tenant=${S.tenant}`);
+    renderGraph(data);
+  } catch (e) {
+    // non-fatal
+  }
+}
+
+async function refreshAll() {
+  await Promise.all([refreshState(), refreshGraph()]);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Button handlers
+══════════════════════════════════════════════════════════════════════════════ */
+
+// Reset
+$('btn-reset').addEventListener('click', async () => {
+  setLoading('btn-reset', true);
+  setStatus('Resetting…', 'loading');
+  try {
+    await api('POST', '/api/reset', { tenant: S.tenant });
+    S.hasDecisions = false;
+    S.suggestedSource = null;
+    S.proveRan = false;
+    S.quarantineDone = false;
+    $('culprits-wrap').innerHTML = '<p class="placeholder-text">Click "Investigate" to rank culprit memories.</p>';
+    $('proof-content').innerHTML = '<p class="placeholder-text">Click "Prove it" after investigating to see the counterfactual proof.</p>';
+    $('replay-result').innerHTML = '';
+    await refreshAll();
+    setStatus('Reset complete.');
+  } catch (e) {
+    setStatus('Reset failed: ' + e.message, 'error');
+  } finally {
+    setLoading('btn-reset', false);
+  }
+});
+
+// Run healthy week
+$('btn-healthy').addEventListener('click', async () => {
+  setLoading('btn-healthy', true);
+  setStatus('Running healthy week…', 'loading');
+  try {
+    const d = await api('POST', '/api/simulate', { tenant: S.tenant, attack: false });
+    setStatus(`Healthy week done — ${d.decisions} decisions recorded.`);
+    await refreshAll();
+  } catch (e) {
+    setStatus('Simulation failed: ' + e.message, 'error');
+  } finally {
+    setLoading('btn-healthy', false);
+  }
+});
+
+// Run week under attack
+$('btn-attack').addEventListener('click', async () => {
+  setLoading('btn-attack', true);
+  setStatus('Running week under attack…', 'loading');
+  try {
+    const d = await api('POST', '/api/simulate', { tenant: S.tenant, attack: true });
+    setStatus(`Attack week done — ${d.decisions} decisions recorded.`);
+    await refreshAll();
+  } catch (e) {
+    setStatus('Simulation failed: ' + e.message, 'error');
+  } finally {
+    setLoading('btn-attack', false);
+  }
+});
+
+// Investigate
+$('btn-investigate').addEventListener('click', async () => {
+  setLoading('btn-investigate', true);
+  setStatus('Investigating…', 'loading');
+  try {
+    const data = await api('GET', `/api/investigate?tenant=${S.tenant}`);
+    S.suggestedSource = data.suggested_source || null;
+    renderCulprits(data.culprits, data.first_drift_day);
+    setStatus(`Investigation complete — drift starts day ${data.first_drift_day ?? 'N/A'}, source flagged: ${S.suggestedSource ?? 'none'}.`);
+    updateButtonStates();
+  } catch (e) {
+    setStatus('Investigate failed: ' + e.message, 'error');
+  } finally {
+    setLoading('btn-investigate', false);
+  }
+});
+
+// Prove it
+$('btn-prove').addEventListener('click', async () => {
+  if (!S.suggestedSource) return;
+  setLoading('btn-prove', true);
+  setStatus('Running counterfactual proof…', 'loading');
+  try {
+    const data = await api('GET', `/api/prove?tenant=${S.tenant}&source=${encodeURIComponent(S.suggestedSource)}`);
+    S.proveRan = true;
+    renderProof(data);
+    setStatus('Proof complete.');
+    updateButtonStates();
+  } catch (e) {
+    setStatus('Prove failed: ' + e.message, 'error');
+  } finally {
+    setLoading('btn-prove', false);
+  }
+});
+
+// Quarantine
+$('btn-quarantine').addEventListener('click', async () => {
+  if (!S.suggestedSource) return;
+  setLoading('btn-quarantine', true);
+  setStatus('Quarantining…', 'loading');
+  try {
+    const data = await api('POST', '/api/quarantine', { tenant: S.tenant, source: S.suggestedSource });
+    S.quarantineDone = true;
+    setStatus(`Quarantined ${data.quarantined.length} memor${data.quarantined.length === 1 ? 'y' : 'ies'}: ${data.quarantined.join(', ')}.`);
+    await refreshAll();
+    updateButtonStates();
+  } catch (e) {
+    setStatus('Quarantine failed: ' + e.message, 'error');
+  } finally {
+    setLoading('btn-quarantine', false);
+  }
+});
+
+// Replay next 2 days
+$('btn-replay').addEventListener('click', async () => {
+  setLoading('btn-replay', true);
+  setStatus('Replaying 2 future days…', 'loading');
+  try {
+    const data = await api('POST', '/api/replay', { tenant: S.tenant });
+    const total = data.decisions.length;
+    const bad   = data.unverified;
+    $('replay-result').innerHTML =
+      `<strong>Replay result:</strong> ${bad === 0
+        ? `✅ <span style="color:var(--success)">0 of ${total} new decisions used the unverified gateway.</span>`
+        : `⚠️ <span style="color:var(--danger)">${bad} of ${total} new decisions still used the unverified gateway.</span>`}`;
+    setStatus('Replay done.');
+  } catch (e) {
+    setStatus('Replay failed: ' + e.message, 'error');
+    $('replay-result').innerHTML = '';
+  } finally {
+    setLoading('btn-replay', false);
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Render helpers
+══════════════════════════════════════════════════════════════════════════════ */
+function renderCulprits(rows, firstDriftDay) {
+  if (!rows || rows.length === 0) {
+    $('culprits-wrap').innerHTML = '<p class="placeholder-text">No culprits found.</p>';
+    return;
+  }
+
+  const thead = `<thead><tr>
+    <th>ID</th><th>Text</th><th>Source</th><th>Trust</th><th>Hits / Total</th><th>Suspicion</th>
+  </tr></thead>`;
+
+  const tbody = '<tbody>' + rows.map(r => {
+    const trustVal = r.trust != null ? r.trust.toFixed(2) : '—';
+    const trustBadge = r.trust == null ? `<span class="badge badge-grey">?</span>`
+      : r.trust < 0.4 ? `<span class="badge badge-red">${trustVal}</span>`
+      : `<span class="badge badge-green">${trustVal}</span>`;
+    return `<tr>
+      <td><code>${r.id}</code></td>
+      <td style="max-width:200px;word-break:break-word;">${r.text || '—'}</td>
+      <td>${r.source_name || '—'}</td>
+      <td>${trustBadge}</td>
+      <td>${r.hits} / ${r.total}</td>
+      <td><strong>${r.suspicion.toFixed(3)}</strong></td>
+    </tr>`;
+  }).join('') + '</tbody>';
+
+  $('culprits-wrap').innerHTML = `<table>${thead}${tbody}</table>`;
+}
+
+function renderProof(data) {
+  const touched    = data.touched;
+  const flipped    = Array.isArray(data.flipped) ? data.flipped.length : data.flipped;
+  const naiveFixed = data.naive_flipped;
+  const badTotal   = data.bad_total;
+  const suspects   = Array.isArray(data.suspects) ? data.suspects : [];
+
+  // exposure_flipped in the API is the *count* of flipped decisions (see views.py)
+  const expTouched = fmt$(data.exposure_touched);
+
+  const html = `
+    <p><span class="num">${badTotal}</span> decisions routed via the unverified gateway.</p>
+    <p><span class="num">${touched}</span> decisions retrieved the suspect memor${suspects.length === 1 ? 'y' : 'ies'}.</p>
+    <p><span class="num">${flipped}</span> of them would have chosen a different tool without the contaminated memories.</p>
+    <p>A source-only trust filter would fix only <span class="num">${naiveFixed}</span> of the bad decisions — lineage quarantine catches the laundered ones too.</p>
+    <p>Exposure of touched decisions: <span class="money">${expTouched}</span>.</p>
+    <p style="margin-top:8px;font-size:12px;color:var(--muted);">Suspect memory IDs:</p>
+    <div class="ids">${suspects.join(', ') || '—'}</div>
+  `;
+  $('proof-content').innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Tenant selector
+══════════════════════════════════════════════════════════════════════════════ */
+$('tenant-select').addEventListener('change', e => {
+  S.tenant = e.target.value;
+  S.hasDecisions = false;
+  S.suggestedSource = null;
+  S.proveRan = false;
+  S.quarantineDone = false;
+  $('culprits-wrap').innerHTML = '<p class="placeholder-text">Click "Investigate" to rank culprit memories.</p>';
+  $('proof-content').innerHTML = '<p class="placeholder-text">Click "Prove it" after investigating to see the counterfactual proof.</p>';
+  $('replay-result').innerHTML = '';
+  updateButtonStates();
+  refreshAll();
+  setStatus(`Switched to tenant: ${S.tenant}`);
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Init
+══════════════════════════════════════════════════════════════════════════════ */
+updateButtonStates();
+refreshAll();
+</script>
+</body>
+</html>
